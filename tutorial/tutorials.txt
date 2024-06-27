@@ -1,0 +1,417 @@
+#### This file includes:
+- Useful Information
+- Downloading Nazca On A New PC
+- Useful Functions
+- General Outline
+- Creating A Circuit From Scratch
+- Pin Error
+- Automating Circuit Creation
+- Higher Level Automation
+- Cross-sections And Layers
+- Recap Of Commands
+- Nazca Commands
+- L_nazca_components_2024 Commands
+
+----------------------- Useful information ---------------------------------------------------
+After downloading L_nazca_components_2024, we can import it with:
+
+import L_nazca_components_2024 as ncm
+
+Then all functions starting with "ncm." can be found in "L_nazca_components_2024\main.py".
+Create the circuit in the code, then end it with "nd.export_gds()" to create the file. The gds-file might now be in the same folder as L_nazca_components_2024, or in the username's folder (on Windows).
+The file can be opened with, for example, KLayout.
+
+		
+------- Downloading Nazca On A New PC --------------------------------------------------------
+Follow the guide at
+https://nazca-design.org/installation/
+Download Anaconda, the Nazca-zip-file, unpack the zip-file, download Pyclipper and Klayout. If, when running Nazca, the following error occurs:
+
+AttributeError 'DataFrame' object has sno attribute 'append'
+
+it means that the "pandas" package that exists in Anaconda, and that Nazca uses, is the incorrect version. At the time of writing, the newer versions do not work with Nazca. We need to install a version of pandas before version 1.5.2. Open "Anaconda Prompt" (which was used to unzip the zip-file during the installation). Then write
+
+pip install "pandas<1.5.2"
+
+If the dowlonad is successful, pandas version 1.5.1 is now installed. When running code, there is a warning: "The frame.append method is deprecated ...", which always appears. However, everything works.
+
+------- Useful Functions -----------------------------------------------------------------------
+These are the main functions in L_nazca_components_2024:
+plus()				Marker that looks like a plus
+taper()				Taper
+strt_wg()			Straight waveguide
+bent_wg()			Bent waveguide
+squircle()			Rectangle with rounded corners, or a racetrack
+circle()			Circle
+generic_bent_wg_pair()		Pair of bent waveguides
+generic_beamsplit()		Beam splitter
+sym_beamsplit()			Symmetric beam splitter
+bump_wg()			Waveguide with a bump
+strt_racetrack_reson()		Straight racetrack resonator
+strt_ring_reson()		Straight ring resonator
+sym_racetrack_reson()		Symmetric racetrack resonator
+sym_ring_reson()		Symmetric ring resonator
+pulley_racetrack_reson()	Pulley racetrack resonator
+pulley_ring_reson()		Pulley ring resonator
+rect_spiral_delay()		Rectangle spiral delay line
+circ_spiral_delay()		Circular spiral delay line
+thermo_ps()			Thermo-optic phase shifter
+electro_ps()			Electro-optic phase shifter
+
+There are four types of bent waveguides (bwg):
+btype:		Name:
+'sbend'		Sbend waveguide
+'sin'		Sine waveguide
+'cobra'		Cobra waveguide
+'bsb'		Bend-straight-bend waveguide
+All waveguides start at the origin and end at pos2, the output point. To change the input point pos1, we need to put the waveguide at pos1. So, pos2 is an input to the function, while pos1 is used in .put() after calling the function.
+
+'sbend':
+Takes width, radius, input and output lengths and pos2 as inputs.
+
+'sin':
+Takes width and pos2 as inputs.
+Only gives good results if the input angle and output angle are the same.
+Starts horizontally and ends horizontally. Given the displacement in x and y, it creates a cosine-like curve from the origin to (x,y,0). The curve contains half a "wavelength". Rotating the input point to an angle a also rotates the output point to the angle a.
+
+'cobra':
+Takes input and output widths, input and output radii, and pos2 as inputs.
+Works for all input and output angles.
+
+'bsb':
+Takes width, input and output radii (or one radius for both), input and output lengths, pos2 and ictype as inputs.
+Works for all input and output angles.
+Finds a curve consisting of a circular arc, followed by a straight line, and then another circular arc. It takes the output point and a radius as input. Both circular arcs have the same radius.
+If the input and output angles are the same, the two circular bends are identical, except that they curve in opposite directions.
+
+
+------- General Outline ------------------------------------------------------------------------
+Usually, we first import all necessary packages. For example, we can import our package:
+import L_nazca_components_2024 as ncm
+We can then, for example, use ncm.sym_racetrack_reson() as a function.
+
+After imports, we usually define xsections and layers. We then define all the new components in their separate functions. We can call functions within functions, automate everything. After defining functions, we call the functions, and then "put" down all elements. If we don't call the functions, nothing happens. The functions are defined but not used. If we don't "put" down all the cells we get from the functions, the final file will be empty. Cells are loaded but not instantiated. At the very end of our code, we write
+
+nd.export_gds()
+
+to export all the put components to a gds-file.
+
+
+------- Creating A Circuit From Scratch --------------------------------------------------------
+First, choose one of the functions from above. This will be our first component, which we will put at the origin. For example, we choose a straight waveguide. We want a width of 1.2 µm and a length of 20 µm. We also need to choose a "cross-section", which decides all the layers that the waveguide will be in. By default, 'XS1' will (in the templates) be the blue layer in Nazca, which can be used for waveguides. 'XS2' can be used for phase shifter conductors.
+
+In the code, we write
+
+xs = 'XS1'
+c1_w = 1.2
+c1_l = 20
+
+wg1_cell = ncm.strt_wg(c1_w1, c1_l1, xs)
+
+"c1_" stands for "component 1". We now have a cell called "wg1_cell". This cell needs to be "put" before it shows up in the files. We put it at some point, in our case the origin. When we put, we create an "instance" of the cell. We write
+
+wg1 = wg1_cell.put(0,0,0)
+
+The instance "wg1" of cell "wg1_cell" now exists and has its input at the origin (0,0,0). We can also write ".put(0)" instead, specifically for the origin. The good thing about separating instances and cells is that we can put "wg1_cell" multiple times, wherever we want. Say we want a second waveguide identical to wg1, but 100 µm below wg1. We would then write
+
+wg2 = wg1_cell.put(0,-100,0)
+
+We used the same cell, but put it at y=-100. We now have two identical wgs. If we want them to differ, we need to create two cells instead of one.
+ 
+Say we then want to add a rectangle spiral delay line at the output of wg1. We need to define the width, gap size, the type of bend in the middle, the number of spirals, and then the total length, or the dimensions of the straight part and the smallest radius. Optionally, we can also add the bending radius in the middle and choose a higher accuracy of the final polygon. One might use the following code:
+
+c2_w = 1.2
+c2_gap = 10
+c2_btype = 'bsb'
+c2_l_tot = 10000
+c2_r_b = 20
+c2_n_spirals = 10
+
+rec_spir1 = ncm.rect_spiral_delay(w=c2_w, gap=c2_gap, btype=c2_btype, l_tot=c2_l_tot, x_os=None, y_os=None, r_lo=None, r_b=c2_r_b, n_spirals=c2_n_spirals, flip=False, xs='XS1', st=st)
+
+We now have the spiral cell. To put an instance of it at the output of wg1, we write
+
+spir1 = rec_spir1.put(wg1.pin['b0'])
+
+wg1.pin['b0'] gives the coordinates for the output of wg1. If we instead wrote wg1.pin['a0'], we would put the spiral at the input of wg1. 'a0' is the first input, 'a1' the second input, 'b0' the first output, 'b1' the second output, etc. We can now continue creating cells of different components and putting them in series until we are satisfied. But say we have wg1 and want to put the spiral cell 100 µm to the right of the output of wg1, instead of right at the output. We need an extra step for this. Writing wg1.pin['b0'] creates a pin, which is fine as long as we do not want to change the coordinates in the pin. But now, we need to unpack the pin and get the coordinates. Below, we save the coordinate for wg1's output in "p1" and then save the input coordinate for the spiral in "spir1_pos_in":
+
+p1 = wg1.pin['b0'].xya()
+x,y,a = p1
+spir1_pos_in = (x+100,y,a)
+
+.xya() makes the pin into a tuple of the form (x,y,a). We then unpack p1, and save each coordinate in x, y and a respectively. Then we create the coordinate and add 100 µm. This is one way to do it. If we want to write this in two lines instead of three, we can write
+
+p1 = wg1.pin['b0'].xya()
+spir1_pos_in = (p1[0]+100, p1[1], p1[2])
+
+There is a second way to do all this, where we do not unpack the pin, but instead use the ".move" function. It looks like this
+
+spir1_pin_in = wg1.pin['b0'].move(100,0,0)
+
+spir1_pin_in is now a pin (not a tuple) with the correct values. ".move" moves the coordinates inside the pin by the amount specified, according to (x,y,a). Here, x=100 µm.
+
+So we have either the moved pin in "spir1_pin_in" or the moved list in "spir1_pos_in". We then put the spiral there, either with "spir1 = spir1_cell.put(spir1_pos_in)" or "spir1 = spir1_cell.put(spir1_pin_in)", both work.
+
+
+------- Pin Error ------------------------------------------------------------------------------
+We cannot use .pin[] on cells. We can only use it on instances of the cell. That is, above we had spir1_cell and spir1. We can write spir1.pin['a0'], but we cannot write spir1_cell.pin['a0'], it gives an error message. This error can be common. Use .pin on put objects, not cells.
+
+
+------- Automating Circuit Creation ------------------------------------------------------------
+Say we have a big circuit consisting of many identical blocks. It would take too much time to put each component one after the other, there may be hundreds. Instead, we iterate, with the help of functions. Each of the basic components is a function f(). We can then define new functions. Each function becomes a new component, or a "block". If we have 10 identical blocks, each with 20 bent waveguides, we first create one function that puts all the 20 wgs correctly, relative to each other within the single block, and then we end that function, and call the function 10 times. Each function call creates a new, identical block, and if we put all 10 of them, we have finished the circuit.
+
+Let's say one block consists of two ring resonator cavities. The upper ring couples to one wg below it, and the lower ring couples to one wg above it. In total, then, from top to bottom, we have a ring, a straight wg, a straight wg, and a ring. This is one block, so we create a function with these four components. There are two ways to do this: the intuitive but more unhelpful way and the slightly less intuitive, but more helpful way. The intuitive way is to write everything in the function exactly like it would be written outside of the function. We create the cells and put them, and the function is finished. This looks nice, but makes things a little clunky. The less intuitive way is to create a new type of cell inside the function, and give it the name of the block. Then we can let the function output this cell. We now call the function and get back a cell, which we can put anywhere.
+
+Now, what are the variables? We have two ring resonators, which each have a gap, width and length of the coupled, straight wg, width and radius of the ring, and the cross-section. That is 6*2 = 12 variables, or 11 normally, since both resonators have the same xsection, the same layers.
+
+The more intuitive way to create the function, which we might not recommend, is the following. For it, we also need the two coordinates for the two inputs of the ring resonator components, we call them pos1 and pos2.
+
+def block1(pos1, pos2, gap1, w_co1, l_co1, w_ring1, r1, gap2, w_co2, l_co2, w_ring2, r2, xs='XS1'):
+    reson1_cell = ncm.strt_ring_reson(gap1, w_co1, l_co1, w_ring1, r1, flip=False, xs)
+    reson2_cell = ncm.strt_ring_reson(gap2, w_co2, l_co2, w_ring2, r2, flip=True, xs)
+    
+    reson1 = reson1_cell.put(pos1)
+    reson2 = reson2_cell.put(pos2)
+
+We can then call the function, whenever we want. For example,
+
+block1((0,0,0),(-100,0,0),10,1,100,1,10,20,1,100,1,20)
+
+and xs becomes 'XS1'. That is the intuitive way to make a function. We might recommend the second way to make a function. It looks like this:
+
+def block1(pos, gap1, w_co1, l_co1, w_ring1, r1, gap2, w_co2, l_co2, w_ring2, r2, xs='XS1'):
+    with nd.Cell(name='Block 1') as B_cell:
+        reson1_cell = ncm.strt_ring_reson(gap1, w_co1, l_co1, w_ring1, r1, flip=False, xs)
+        reson2_cell = ncm.strt_ring_reson(gap2, w_co2, l_co2, w_ring2, r2, flip=True, xs)
+        
+        reson1 = reson1_cell.put(0)
+        reson2 = reson2_cell.put(pos)
+        
+        nd.Pin("a0", pin=reson1.pin["a0"]).put()
+        nd.Pin("b0", pin=reson1.pin["b0"]).put()
+        nd.Pin("a1", pin=reson2.pin["a0"]).put()
+        nd.Pin("b1", pin=reson2.pin["b0"]).put()
+    return B_cell
+
+If we want 3 copies of this block, we can then write something like
+
+bl_cell = block1(pos, gap1, w_co1, l_co1, w_ring1, r1, gap2, w_co2, l_co2, w_ring2, r2)
+
+bl1 = bl_cell.put(0)
+bl2 = bl_cell.put(bl1.pin['b0'])
+bl3 = bl_cell.put(bl2.pin['b0'])
+
+Assuming all of the variables are defined. The function gives us a cell called "Block 1". If we open the gds-file in KLayout, we will see that there is a component called "Block 1". This is very helpful to keep track of things. Notice that the function only takes one position as input. It is the position of the second resonator, relative to the position of the first resonator. When making a component, it is adviced to put one component at the origin, as we have done for reson1. It makes things easier to keep track of. Now, bl1, bl2 and bl3 start at different points, but for all of them, the bottom resonator starts at pos, relative to the top resonator. The fact that we put the components within the function is ignored because it happens within the "with nd.Cell" line. Everything within this "with" indent does not get put, but instead becomes a part of the cell. Calling the function block1() on its own does not do anything, since the output is only a cell, which still needs to be put.
+
+The last four lines of the function define the pins of our block. "b1" of the block becomes "b0" of the second resonator within the block. Therefore, later we wrote bl1.pin['b0']. This is the 'b0' pin (the first output) of bl1, which we define to be 'b0' of resonator 1 within the block, but this fact does not exist outside the function. We cannot write reson1.pin['b0'] outside of the function, because reson1 only exists within the function. To keep pins outside of the function, we need to use the nd.Pin command, as we did in the function.
+
+Also, when we define the 'a0' pin, that point automatically gets put at (0,0,0) when we use the function. As in, even if we wrote "reson1 = reson1_cell.put(1000,1000,180)" instead of .put(0), the first resonator's input would always be put at the origin (0,0,0), simply because we defined nd.Pin('a0', ...). This also "drags" all other components with the first resonator. In our example, the position of reson1 "starts" at (1000,1000,180) and gets dragged to (0,0,0). If the second resonator was defined to be at (50,80,90), it would be dragged to (50-1000,80-1000,180-90) = (-950,-920,90). Only the relative position matters. To get the second resonator at (50,80,90) outside of the function, we would need to put the entire block at (1000,1000,180) instead of, say, the origin. Then everything within the function looks identical to everything outside. But we don't need that, and it becomes clunky, so we can let reson1 be put at the origin, since its input pin will get dragged to the origin anyway when we use nd.Pin('a0',...). Note that this can rotate the entire cell, if the point gets dragged from a non-zero angle to zero. This might lead to frustration. Therefore, inside of functions, we might recommend using angle 0 as much as possible, especially for the point that will become the input (reson1.pin["a0"] in our case).
+
+Because of how we defined the code above, the input of bl1 (bl1.pin['a0']) is at the origin, then the input of bl2 is at the output of bl1, etc. Everything gets aligned automatically. The 'a1' pins are correct automatically, as long as the separation between 'a0' and 'a1' is the same for each block. If it is different, there will be gaps, and we need to add waveguides between 'b1' and 'a1' of the blocks. Also, we can of course put the second block anywhere, even the second output of bl1, instead of the first. That is, we can write bl2 = "bl_cell.put(bl1.pin['b1'])". It works just fine. But the other waveguides are not aligned, then.
+
+All of the components we have defined in the package use this "with nd.Cell" structure.
+
+------- Higher Level Automation ----------------------------------------------------------------
+Say we have defined a block function block1() which creates a "block" cell. If we want a circuit with 50 block1()-blocks at regular intervals, we don't want to write out 50 lines of "block1()". To sovle this, we can automate the automation. Say that all 50 blocks are identical except in position, and say we have 5 blocks stacked on top of each other in y, and a collection of 10 blocks in x. That is, we have 10 columns and 5 rows in the circuit. Finally, say the size of each block is (delta_x, delta_y) = (200,100). The top left block starts at the origin. To automate, we can write the following:
+
+def create_circuit1(delta_x, delta_y, a,b,c,...):
+    with nd.Cell(name='Circuit 1') as C_cell:
+        bl_cell = block1(a,b,c,...)
+        
+        bl_list = []
+        
+        for i in range(10):
+            for j in range(5):
+                pos = ( delta_x*i, -delta_y*j, 0 )
+                bl_list.append(
+                    bl_cell.put(pos)
+                    )
+    return C_cell
+
+circuit_cell = create_circuit1(200,100,...)
+circuit = circuit_cell.put(0)
+
+The minus sign before delta_y is there since the first block is the highest one, and each new block in the same column is below. That is, the y-value decreases with each row. If we want it to increase, we use plus. Then the first block becomes the bottom left instead of top left one. The entire 5 x 10 circuit gets put at 0, so it starts at the origin. We can then create a duplicate by putting circuit_cell again, etc. We have not yet added pins to the circuit. If this circuit function contains the entire, final circuit, we don't need to define pins. We only need pins if we want to put new components at the inputs/outputs of our old component (here, the circuit). Now, in the function, instead of
+                bl_list.append(
+                    bl_cell.put(pos)
+                    )
+we can also just write
+                bl_temporary = bl_cell.put(pos)
+                bl_list.append(bl_temporary)
+Then bl_temporary changes value for each i and j. In our function, i goes from 0 to 9 and j from 0 to 4. That is how range() works. bl_list thus looks something like [Instance 1 of bl_cell, Instance 2, ...]. The list disappears when the function is done, we don't need it. Again, this is because everything happens within the "with nd.Cell" line, so the act of putting each "block" cell gets saved to the "circuit" cell. Therefore, bl_list is not necessary. However, it is adviced to save all of the elements in some variable(s) within each function, like we do with bl_list. This allows us to define pins, for example. Anyway, we return the final cell C_cell. Anything that happens outside of the nd.Cell code, but still within the function, is not a part of the final cell.
+
+Now say we want to do a similar thing, but not go through all values of i and j between 0-9 and 0-4. Say we only want (i,j) to be (0,0), (1,1) and (6,2). To automate this to bigger circuits, we can define a list like
+ij_list = [ (0,0),
+            (1,1),
+            (6,2) ]
+which has all of the i-j combinations. Then we go through these three cases with
+
+a = []
+for i,j in ij_list:
+    a.append( a_cell.put(i,j,0) )
+
+for example. After this, a will have three elements: the ones at (0,0), (1,1) and (6,2). Finally, we can also create lists of lists, which have the same information as a matrix. For example:
+a = [[1,2],[3,4]]
+or
+a = [[1,2],
+     [3,4]]
+is a 2 x 2 matrix. The top left element is found with a[0][0], since lists start at 0. a[1][0] would be 3, since we first choose the second of the two bigger lists ([3,4]), then the first element of this list (3). It is useful to save a 2D-circuit in a matrix.
+
+
+------- Cross-sections And Layers --------------------------------------------------------------
+At the beginning of our package, we define cross-sections (xs) and layers. In every program, we first need to add all layers that we will use. We then define the xsections. The templates have defined xs1, xs2 and xs3. xs1 consists of the layer "L1". This means nothing to us, unless we also have the dictionary at the top: all_layers. It tells us that "L1" means the layer with the index (1,0). This index can be seen for example in KLayout. (1,0) in KLayout is 1/0 Shallow_Guide. The first two numbers are the index. all_layers is just something we have defined, it holds no greater meaning, it just helps to keep track of all layers. More layers can be added to it. Anyway, xs1 has L1, xs2 has L2, and xs3 has both L1 and L2. Therefore, if a component, say, a beam splitter, uses xs2, it will be created in layer L2. xs3 will create it in both L1 and L2. More xsections can be added easily, as the templates show. After loading all layers and defining all xsections, all we need is the xsection name (for example, 'XS1' for xs1). This string 'XS1' is what we put inside the function for the beam splitter. That is, xs='XS1', in other words, xs=xs1. If we want the xsection xs4, we first need to define it, and then we can write xs=xs4.
+
+Some Nazca functions only take layers as input, not xsections. Then we need to use layer names like 'L1' and 'L3' instead of xsection names 'XS1'. But in our package, if we want the Nazca function to create the same component in all layers for say, xsection 'XS3', all we need to do is write
+
+layers = xs_ls[xs3]
+for l in layers:
+    nd.component(l, etc...).put(0)
+
+That is, at the beginning, we defined xs_ls. And we said that xs_ls[xs3] = ['L1', 'L2'], it is a list with the two layers L1 and L2. We let layers equal this list. At the end, this has the same effect as if the component could take an xsection as input. This extra code is needed only if xsections cannot be used.
+
+------- Recap Of Commands ----------------------------------------------------------------------
+import L_nazca_components_2024 as ncm			Load all of the components
+nd.export_gds()						Creating gds-file
+.put(x,y,a)						Put a cell at x,y,a. We get back an instance
+.pin['b0']						Get pin of an instance
+.xya()							Convert pin to a tuple (x,y,a)
+.move(x,y,a)						Add (x,y,a) to a pin
+with nd.Cell(name='...') as cell:			To create a cell. ".put" does not actually put
+nd.Pin("a0", pin=elm.pin["a0"]).put()			Makes 'a0' input of elm the 'a0' input of the new cell. If elm.pin["a0"] is non-zero, the entire component gets dragged such that elm.pin["a0"] is at the origin. If elm.pin["a0"] has a non-zero angle, the entire component likewise gets rotated.
+for l in layers:					Go through all layers l in "layers"
+xs_ls['XS1']						Get a list of all layers in xs1, if xs_ls is defined
+
+
+------- Nazca Commands -------------------------------------------------------------------------
+The functions that the package uses from Nazca are the following. These functions are used to create new components from scratch. Note that "nd" stands for "nazca" and "ic" for "nazca.interconnects.Interconnect(xs=xs)". Information about all of the functions can be found at https://nazca-design.org/manual/nazca.html. There is a quick search function at the lower right of the page. In order of appearance, these are the functions used:
+
+nd.add_layer(name, layer)
+nd.add_xsection(name)
+nd.add_layer2xsection(xsection, layer)
+nd.Cell(name)
+nd.Polygon(points, layer)
+nd.geometries.taper(length, width1, width2)
+nd.geometries.rectangle(length, height)
+nd.Pin(pin)
+ic.strt(length, width)
+ic._sbend_solve(radius, width, pin, offset)
+nd.mask_elements.curve2polyline(fie, xya, acc, args)
+nd.generic_bend.sinebend_point
+nd.mask_elements.__get_offset(xs, width, radius)
+nd.generic_bend.gb_coefficients(xya, radius1, radius2)
+nd.util.polyline2edge(xy, width1, width2, grow, line)
+ic.bend_strt_bend_p2p(pin1, pin2, radius, width)
+ic.sbend(radius, width, pin, offset)
+ic.sinebend(width, pin, distance, offset)
+nd.mask_elements.cobra(xya, width1, width2, xs)
+nd.mask_elements.bend(radius, width, angle, xs)
+ic.strt_p2p(pin1, pin2, width)
+
+All other functions come from numpy, random or are defined within the package.
+
+
+------- L_nazca_components_2024 Commands ---------------------------------------------------
+The functions we define within our package are, in order of appearance, the following:
+
+######## In L_nazca_components_2024
+#### Layers
+load_all_layers(all_layers)
+make_xsection(xs_name, xs_ls)
+
+#### Generic
+get_n_str()
+pythagoras(p1, p2)
+atan(p1, p2)
+polar_to_cart(r, ang)
+add_pos(p1, p2, minus=False, add_a=True)
+rotate_pos(pos, rot_a, pos0=(0,0,0), rotate_a=False)
+check_unitary(A, tolerance=1e-14, st=False)
+
+#### Components
+make_plus_(layers, x_wide, y_wide, x_tall=None, y_tall=None, st=False)
+make_tp_(layers, w_in, w_out, l, st=False)
+make_strt_object_(xs, w, l, is_con=False, st=False)
+mbo_update_name_(cname, btype, st=False)
+mbo_get_xsb_xgl_(xs, w, r, pos2, st=False)
+mbo_get_pos2_(p1, p2, st=False)
+mbo_axy_arc(xy, r, ang, da, st=False)
+mbo_get_all_xy_(xs, w, r, pos2, btype, ang=0, st=False)
+mbo_get_l_(xs, w, r, pos2, btype, st=False)
+make_b_object_(xs, w, r, pos2, btype, is_con=False, st=False)
+make_bo_pair_(xs, w1, w2, r1, r2, pos2, pos3, pos4, btype1, btype2, is_con=False, st=False)
+make_sqrc_(xs, w, x_os, y_os, r, pos, st=False)
+make_bs_(xs, w0, w1, w2, l0, l1, l2, r1, r2, pos2, pos3, btype1, btype2, gap=None, flip=False, st=False)
+make_sym_bs_(xs, w, l_in, l_out, r, pos2, btype, gap=None, flip=False, st=False)
+make_bump_wg_(xs, w, l, r_hi, r_lo, ang, pos_arc, pos_strt2, btype1, btype2, flip=False, st=False)
+mrtr_update_name_(cname, rtr_type, x_os, y_os, is_ring=False, st=False)
+make_rtr_(xs, rtr_type, w_co, w_tk, x_os_tk, y_os_tk, r_tk, l_co, r_co, ang, pos_arc, pos_strt2, pos_tk, btype1, btype2, flip=False, is_ring=False, st=False)
+
+#### Components - Spiral Delay Line
+mdl_get_l_(xs, w, dr, x_os, y_os, r_lo, n_spirals, btype, r_b, st=False)
+mdl_update_xflips_(x, dx, flip, l, l_t1, l_t2, st=False)
+mdl_optimize_size_(xs, w, dr, l, btype, x_os=None, y_os=None, r_lo=None, r_b=None, n_spirals=2, dx=10, dy=10, drl=10, max_steps=100, l_error=0.01, xy_same=False, st=False)
+make_delay_line_(xs, w, gap, btype, l=None, x_os=None, y_os=None, r_lo=None, r_b=None, n_spirals=None, dx=10, dy=10, drl=10, max_steps=100, l_error=0.01, xy_same=False, flip=False, is_circ=False, st=False)
+
+#### Components - Electric Conductors
+make_pad_(layers, x, y, st=False)
+mps_all_cons_(all_xs, all_w, all_r, all_p, all_btype, st=False)
+make_to_ps_(xs, all_w, all_r, p0, all_btype, all_pts, layers_pad=['L1'], xy_pad=None, pads=False, flip=False, st=False)
+make_eo_ps_(xs, all_w1, all_w2, all_r1, all_r2, p0, all_btype1, all_btype2, all_pts1, all_pts2, layers_pad=['L1'], xy_pad=None, pads=False, flip=False, st=False)
+
+#### User-Friendly Functions
+plus(x_wide, y_wide, x_tall=None, y_tall=None, layers=['L1'], st=False, put=False)
+taper(w_in, w_out, l, layers=['L1'], st=False, put=False)
+strt_wg(w, l, xs='XS1', st=False, put=False)
+bent_wg(w, x_tot, y_tot, r, btype, xs='XS1', st=False, put=False)
+bwgp_get_py2_3_4_(gap_in, gap_out, y_tot_b_hi, y_tot_b_lo, st=False)
+generic_bent_wg_pair(w_hi, r_hi, x_tot_b_hi, y_tot_b_hi=None, btype_hi='cobra', w_lo=1, r_lo=10, x_tot_b_lo=20, y_tot_b_lo=None, btype_lo='cobra', gap_in=None, gap_out=None, xs='XS1', st=False, put=False)
+squircle(w, x_os, y_os, r, xs='XS1', st=False, put=False)
+circle(w, r, xs='XS1', st=False, put=False)
+generic_beamsplit(w_in, l_in, w_hi, l_hi, r_hi, x_tot_b_hi, y_tot_b_hi, btype_hi, w_lo, l_lo, r_lo, x_tot_b_lo, y_tot_b_lo, btype_lo, gap=None, flip=False, xs='XS1', st=False, put=False)
+sym_beamsplit(w, l_in, l_out, x_tot_b, y_tot_b, r, btype, gap=None, flip=False, xs='XS1', st=False, put=False)
+bump_wg(w, l_bump, x_tot, x_bump_middle, bump_height, r_hi, r_lo, ang, btype_in, btype_out, flip=False, xs='XS1', st=False, put=False)
+strt_racetrack_reson(gap, w_co, l_co, w_tk, x_os_tk, y_os_tk, r, flip=False, xs='XS1', is_ring=False, st=False, put=False)
+strt_ring_reson(gap, w_co, l_co, w_ring, r, flip=False, xs='XS1', st=False, put=False)
+sym_racetrack_reson(gap, w_co, l_co, r_co, w_tk, x_os_tk, y_os_tk, r_tk, x_tot, bump_height, ang, btype_in, btype_out, flip=False, xs='XS1', is_ring=False, st=False, put=False)
+sym_ring_reson(gap, w_co, l_co, r_co, w_ring, r_ring, x_tot, bump_height, ang, btype_in, btype_out, flip=False, xs='XS1', st=False, put=False)
+pulley_racetrack_reson(gap, w_co, l_co_extra, r_co, w_tk, x_os_tk, y_os_tk, r_tk, x_tot, bump_height, ang, btype_in, btype_out, flip=False, xs='XS1', is_ring=False, st=False, put=False)
+pulley_ring_reson(gap, w_co, l_co_extra, r_co, w_ring, r_ring, x_tot, bump_height, ang, btype_in, btype_out, flip=False, xs='XS1', st=False, put=False)
+rect_spiral_delay(w, gap, btype, l_tot=None, x_os=None, y_os=None, r_lo=None, r_b=None, n_spirals=2, dx_start=10, dy_start=10, drl_start=10, max_steps=100, l_error=0.01, xy_same=False, flip=False, xs='XS1', st=False, put=False)
+circ_spiral_delay(w, gap, btype, l_tot=None, r_lo=None, r_b=None, n_spirals=2, drl_start=10, max_steps=100, l_error=0.01, flip=False, xs='XS1', st=False, put=False)
+pad(x, y, xs='XS1', st=False, put=False)
+thermo_ps(all_w, all_r, p0, all_btype, all_pts, xy_pad=None, pads=False, flip=False, xs='XS2', layers_pad=['L1'], st=False, put=False)
+electro_ps(all_w1, all_w2, all_r1, all_r2, p0, all_btype1, all_btype2, all_pts1, all_pts2, xy_pad=None, pads=False, flip=False, xs='XS2', layers_pad=['L1'], st=False, put=False)
+
+pap_update_values_(i_lo, i_lo2, i_hi, i_max, all_w, all_r, all_btype, all_pts, p0=None, w=None, r=None, btype=None, point=None, ori_type='zero', ori_ang=False, st=False)
+ps_add_point(all_w, all_r, all_btype, all_pts, p0=None, index=0, w=None, r=None, btype=None, point=None, ori_type='zero', ori_ang=False, ps_index=None, hi_or_lo=None, st=False)
+
+######## In L_nazca_components_2024.NxN_circuit
+#### NxN Unitary Circuit, Abstract Waveguide Grid Functions
+NxNm_get_M(c_type, N, st=False)
+NxN_apy_make_column(N, y_init, dy, st=False)
+NxNm_ap_y(c_type, N, w, gap_large, gap_small, st=False)
+NxNm_ap_x(N, delta_x_list, st=False)
+NxN_ap_tups(x_tot, y_tot, st=False)
+NxNm_get_all_pos(c_type, N, w, gap_large, gap_small, gap_large_t1, gap_small_t1, delta_x_list, st=False)
+NxN_ap_add_taper(all_pos, all_lt, st=False)
+
+#### NxN Unitary Circuit, Abstract Phase Shifter Functions
+NxNm_ps_num(c_type, N, init_layer=False, final_layer=False, st=False)
+NxNm_all_ij_list(c_type, N, M, init_layer, final_layer, st=False)
+NxN_get_ntype(N, j, j_edge, ignore=False, st=False)
+NxN_all_ntype_list(c_type, N, M, all_ij_list, ps_mid_ntype, j_edge, st=False)
+NxN_format_aij_list(all_ij_list, all_ntype_list, flip=False, st=False)
+NxNm_ps_all_ij(c_type, N, M, init_layer, final_layer, ps_mid_ntype, j_edge, flip=False, st=False)
+NxN_ps_all_io(ps_all_ij, y_hi, y_lo, x_hi, x_lo, dx_hi, dx_lo, ps_all_ang, st=False)
+NxN_ps_ieo_get_ioco(is_eo, all_w, all_pos, a_io, a_gap, a_w1, a_w2, a_os, a_l, i, j, st=False)
+NxN_ps_ioe_add_extra(is_hi, pos_i_ex_, pos_o_ex_inv_, pos_o_, st=False)
+NxN_ps_ioe_pts(is_eo, is_hi, all_w, all_pos, all_ij, all_io, all_gap, all_w1, all_w2, all_os, all_l, aoa_pi_ex, aoa_po_ex, st=False)
+NxN_ps_pts(N, ps_type, ps_all_io, ps_aoa_pi_ex, ps_aoa_po_ex, all_pos, ps_all_ij, all_w, ps_all_w1, ps_all_w2, ps_all_gap, ps_all_l, ps_all_os, y_hi, y_lo, x_hi, x_lo, dx_hi, dx_lo, st=False)
+NxN_format_ps_aoa(ps_all_xs, ps_aoa_w1, ps_aoa_w2, ps_aoa_r1, ps_aoa_r2, ps_all_p0, ps_aoa_pts1, ps_aoa_pts2, ps_aoa_btype1, ps_aoa_btype2, all_layers_pad, all_xy_pad, st=False)
+
+#### NxN Unitary Circuit, Nazca Functions
+NxN_make_all_ps(ps_type, ps_all_xs, ps_aoa_w1, ps_aoa_w2, ps_aoa_r1, ps_aoa_r2, ps_all_p0, ps_aoa_pts1, ps_aoa_pts2, ps_aoa_btype1, ps_aoa_btype2, all_layers_pad=[], all_xy_pad=[], pads=False, st=False)
+NxN_circuit(all_pos, cell_type, all_w, all_r, all_btype, ps_type, ps_all_xs, ps_aoa_w1, ps_aoa_w2, ps_aoa_r1, ps_aoa_r2, ps_all_p0, ps_aoa_pts1, ps_aoa_pts2, ps_aoa_btype1, ps_aoa_btype2, all_layers_pad=[], all_xy_pad=[], pads=False, st=False)
+NxN_swap_ps_io(ps_all_io, hi_or_lo, index1, index2, io1, io2, st=False)
+NxN_delete_ps_list(list0, index, hl, st=False)
+NxN_delete_ps(index, hi_or_lo, ps_type, ps_num, ps_all_ij, ps_num_hi, ps_num_lo, ps_all_io, ps_all_xs, ps_all_w1, ps_all_w2, ps_all_ang, ps_all_gap, ps_all_l, ps_all_os, all_layers_pad, all_xy_pad, ps_aoa_pi_ex, ps_aoa_po_ex, st=False)
